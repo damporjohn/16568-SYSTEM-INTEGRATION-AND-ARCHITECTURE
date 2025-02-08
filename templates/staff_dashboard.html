@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h2 class="card-title text-center">Welcome, {{ firstname }}!</h2>
+                    <h4 class="text-center text-secondary">Staff Dashboard</h4>
+
+                    <!-- Search Bar -->
+                    <div class="mb-4">
+                        <form method="GET" action="{{ url_for('search_reservation') }}">
+                            <div class="input-group">
+                                <input type="text" name="query" class="form-control" placeholder="Search by Username, Lab ID, or Date" required>
+                                <button class="btn btn-primary" type="submit">Search</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="mb-4 d-flex flex-wrap gap-2">
+                        <a href="{{ url_for('reset_session') }}" class="btn btn-warning">Reset Session</a>
+                        <a href="{{ url_for('sit_in_records') }}" class="btn btn-info">View Sit-in Record</a>
+                        <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+                    </div>
+
+                    <!-- Sit-in Reservations for Today -->
+                    <h5 class="mt-3">Sit-in Reservations</h5>
+                    {% if today_reservations and today_reservations|length > 0 %}
+                        <table class="table table-bordered table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Lab ID</th>
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for res in today_reservations %}
+                                <tr>
+                                    <td>{{ res[1] }}</td> <!-- Adjust column index based on DB schema -->
+                                    <td>{{ res[2] }}</td>
+                                    <td>{{ res[3] }}</td>
+                                    <td>{{ res[4] }}</td>
+                                    <td>
+                                        <a href="{{ url_for('delete_reservation', reservation_id=res[0]) }}" class="btn btn-sm btn-danger">Delete</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p class="text-muted text-center">No sit-in reservations for today.</p>
+                    {% endif %}
+
+                    <!-- Reservation Lists -->
+                    <h5 class="mt-4">Reservation Lists</h5>
+                    <div class="list-group">
+                        <a href="{{ url_for('view_past_reservations') }}" class="list-group-item list-group-item-action">📅 Past Reservations</a>
+                        <a href="{{ url_for('view_present_reservations') }}" class="list-group-item list-group-item-action">📍 Present Reservations</a>
+                        <a href="{{ url_for('view_future_reservations') }}" class="list-group-item list-group-item-action">🚀 Future Reservations</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

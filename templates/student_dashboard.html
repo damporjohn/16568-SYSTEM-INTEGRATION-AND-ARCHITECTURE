@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mt-5">Welcome, {{ firstname }}!</h2>
+    <p>You are logged in.</p>
+
+    <div class="row">
+        <!-- Edit Record Section -->
+        <div class="col-md-4">
+            <h4>Edit Your Record</h4>
+            <a href="{{ url_for('edit_student_record') }}" class="btn btn-primary">Edit Record</a>
+        </div>
+
+        <!-- View Remaining Sessions -->
+        <div class="col-md-4">
+            <h4>Remaining Sit-In Sessions</h4>
+            <p>You have <strong>{{ remaining_sessions }}</strong> sessions left.</p>
+        </div>
+
+        <!-- Make Reservation -->
+        <div class="col-md-4">
+            <h4>Make a Reservation</h4>
+            <form action="{{ url_for('make_reservation') }}" method="POST">
+                <div class="form-group">
+                    <label for="lab">Select Lab:</label>
+                    <select class="form-control" id="lab" name="lab" required>
+                        {% if labs %}
+                            {% for lab in labs %}
+                                <option value="{{ lab['id'] }}">{{ lab['number'] }} (Capacity: {{ lab['capacity'] }})</option>
+                            {% endfor %}
+                        {% else %}
+                            <option disabled>No labs available</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="date">Date:</label>
+                    <input type="date" class="form-control" id="date" name="date" required>
+                </div>
+                <div class="form-group">
+                    <label for="time">Time:</label>
+                    <input type="time" class="form-control" id="time" name="time" required>
+                </div>
+                <button type="submit" class="btn btn-success mt-2">Reserve</button>
+            </form>
+        </div>
+        
+    <hr>
+    <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+</div>
+{% endblock %}

@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container text-center">
+    <h2 class="mt-5">Admin Dashboard</h2>
+
+    <!-- Buttons to trigger modals -->
+    <div class="d-inline-block">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#deanInformationModal">
+            View Deans
+        </button>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#staffInformationModal">
+            View Staff Members
+        </button>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#compLabModal">
+            View Computer Labs
+        </button>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+    </div>
+</div>
+
+<!-- View Deans Modal -->
+<div class="modal fade" id="deanInformationModal" tabindex="-1" aria-labelledby="deanInformationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deanInformationModalLabel">Dean Details</h5>             
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+                            <!-- Add Dean Button -->
+                            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addDeanModal" style="float: right;">
+                                Add Dean
+                            </button>
+            <div class="modal-body">
+                {% if deans %}
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>ID Number</th>
+                                <th>Name</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Department</th>
+                                <th>Registration Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for dean in deans %}
+                            <tr>
+                                <td>{{ dean[1] }}</td> <!-- ID Number -->
+                                <td>{{ dean[3] }} {{ dean[4] }}</td> <!-- First Name + Last Name -->
+                                <td>{{ dean[2] }}</td> <!-- Username -->
+                                <td>{{ dean[5] }}</td> <!-- Email -->
+                                <td>{{ dean[6] }}</td> <!-- Department -->
+                                <td>{{ dean[7] }}</td> <!-- Registration Date -->
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="text-muted">No deans available.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Dean Modal -->
+<div class="modal fade" id="addDeanModal" tabindex="-1" aria-labelledby="addDeanModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addDeanModalLabel">Add New Dean</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('add_dean') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="dean_id" class="form-label">ID Number</label>
+                        <input type="text" class="form-control" id="dean_id" name="dean_id" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="dean_username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="dean_username" name="dean_username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="dean_firstname" class="form-label">First Name</label>
+                        <input type="text" class="form-control" id="dean_firstname" name="dean_firstname" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="dean_lastname" class="form-label">Last Name</label>
+                        <input type="text" class="form-control" id="dean_lastname" name="dean_lastname" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="dean_email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="dean_email" name="dean_email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="dean_department" class="form-label">Department</label>
+                        <select class="form-control" id="dean_department" name="dean_department" required>
+                            <option value="" disabled selected>Select a department</option>
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="Information Technology">Information Technology</option>
+                            <option value="Software Engineering">Software Engineering</option>
+                            <option value="Cybersecurity">Cybersecurity</option>
+                            <option value="Data Science">Data Science</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>                            
+                    <button type="submit" class="btn btn-success">Add Dean</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Staff Information Modal -->
+    <div class="modal fade" id="staffInformationModal" tabindex="-1" aria-labelledby="staffInformationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="staffInformationModalLabel">Staff Members</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID Number</th>
+                                <th>Username</th>
+                                <th>First Name</th>
+                                <th>Last Name</th>
+                                <th>Registration Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for member in staff_members %}
+                            <tr>
+                                <td>{{ member[0] }}</td>
+                                <td>{{ member[1] }}</td>
+                                <td>{{ member[2] }}</td>
+                                <td>{{ member[3] }}</td>
+                                <td>{{ member[4] }}</td>
+                                <td>
+                                    <form action="{{ url_for('delete_staff', idno=member[0]) }}" method="POST" style="display:inline;">
+                                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Computer Laboratories Modal -->
+    <div class="modal fade" id="compLabModal" tabindex="-1" aria-labelledby="compLabModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="compLabModalLabel">Computer Laboratories Status</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Lab Number</th>
+                                <th>Status</th>
+                                <th>Capacity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lab in labs %}
+                            <tr>
+                                <td>{{ lab[1] }}</td>  <!-- Lab number -->
+                                <td>{{ lab[3] }}</td>  <!-- Lab status -->
+                                <td>{{ lab[2] }}</td>  <!-- Lab capacity -->
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+    
+                    <hr>
+    
+                    <!-- Button to open Add Lab modal -->
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLabModal">
+                        Add New Computer Lab
+                    </button>
+    
+                    <!-- Add Computer Lab Modal -->
+                    <div class="modal fade" id="addLabModal" tabindex="-1" aria-labelledby="addLabModalLabel" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="addLabModalLabel">Add New Computer Lab</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <form action="{{ url_for('add_lab') }}" method="POST">
+                                        <div class="mb-3">
+                                            <label for="lab_number" class="form-label">Lab Number</label>
+                                            <input type="text" class="form-control" id="lab_number" name="lab_number" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="lab_capacity" class="form-label">Capacity</label>
+                                            <input type="number" class="form-control" id="lab_capacity" name="lab_capacity" required>
+                                        </div>
+                                        <button type="submit" class="btn btn-success">Confirm</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+    
+                </div>
+            </div>
+        </div>
+    </div>
+       
+
+{% endblock %}
