@@ -1,7 +1,9 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime  # Correct import
+from datetime import datetime  
+
+registration_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Set your secret key for session management
@@ -36,6 +38,19 @@ def init_db():
             ''')
             conn.commit()
 
+    """Create required database tables if they do not exist."""
+    with sqlite3.connect('labs.db') as conn:
+        cur = conn.cursor()
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS labs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                number TEXT UNIQUE NOT NULL,
+                capacity INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'Available'
+            )
+        ''')
+        conn.commit()
+
     # Create the deans table inside adminuser.db
     with sqlite3.connect("adminuser.db") as conn:
         cursor = conn.cursor()
@@ -51,16 +66,11 @@ def init_db():
         )''')
         conn.commit()
 
-    # Create the computer_labs table
-    with sqlite3.connect('labs.db') as conn:
-        cursor = conn.cursor()
-        cursor.execute('''CREATE TABLE IF NOT EXISTS computer_labs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            number TEXT UNIQUE NOT NULL,
-            capacity INTEGER NOT NULL,
-            status TEXT NOT NULL DEFAULT 'Available'
-        )''')
-        conn.commit()
+
+        
+        print("Database initialized successfully.")  # Correct indentation
+
+    # Run this function once to initialize the database
 
     with sqlite3.connect("studentuser.db") as conn:
         cursor = conn.cursor()
@@ -153,11 +163,6 @@ else:
     print("Table 'students' does not exist!")
 
 conn.close()
-
-
-# Initialize the database
-init_db()
-
 
 
 
@@ -426,18 +431,6 @@ def admin_dashboard():
 
     return render_template('admin_dashboard.html', staff_members=staff_members, deans=deans, labs=labs)
 
-
-
-
-
-
-
-
-
-
-
-
-
 #MAG DELETE OG STAFF
 @app.route('/delete_staff/<idno>', methods=['POST'])
 def delete_staff(idno):
@@ -455,17 +448,6 @@ def delete_staff(idno):
 
     return redirect(url_for('admin_dashboard'))  # Redirect back to admin dashboard
 
-
-
-
-
-
-
-
-
-
-
-
 #MAG ADD/REGISTER OG DEAN
 @app.route('/add_dean', methods=['POST'])
 def add_dean():
@@ -475,7 +457,6 @@ def add_dean():
     last_name = request.form['dean_lastname']
     email = request.form['dean_email']
     department = request.form['dean_department']
-    registration_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     try:
         with sqlite3.connect('adminuser.db') as conn:
@@ -493,30 +474,28 @@ def add_dean():
 
     return redirect(url_for('admin_dashboard'))
 
-
-
-
-
-
-
-
-
-
-
-
 #ADD OG LABORATORY 
 @app.route('/add_lab', methods=['POST'])
 def add_lab():
-    lab_number = request.form['lab_number']
-    capacity = request.form['lab_capacity']
+    if request.method == 'POST':
+        lab_number = request.form.get('lab_number', '').strip()
+        capacity = request.form.get('lab_capacity', '').strip()
 
-    # Insert into database
-    conn = sqlite3.connect('labs.db')
-    cur = conn.cursor()
-    cur.execute("INSERT INTO computer_labs (number, capacity, status) VALUES (?, ?, 'Available')",
-                (lab_number, capacity))
-    conn.commit()
-    conn.close()
+        if not lab_number or not capacity:
+            flash("Lab Number and Capacity are required!", "danger")
+            return redirect(url_for('admin_dashboard'))
+
+        try:
+            with sqlite3.connect('labs.db') as conn:
+                cur = conn.cursor()
+                cur.execute("INSERT INTO computer_labs (number, capacity, status) VALUES (?, ?, ?)", 
+                            (lab_number, capacity, "Available"))
+                conn.commit()
+            flash("Lab added successfully!", "success")
+        except sqlite3.IntegrityError:
+            flash("Error: Lab number already exists!", "warning")
+        except sqlite3.Error as e:
+            flash(f"Database Error: {e}", "danger")
 
     return redirect(url_for('admin_dashboard'))
 
@@ -531,38 +510,6 @@ def add_lab():
 
 
 
-
-
-
-# Route: Student Dashboard
-@app.route('/student/dashboard')
-def student_dashboard():
-    if 'username' not in session or session.get('role') != 'students':
-        return redirect(url_for('login'))
-    
-    labs = get_labs()  # Fetch labs from the database
-
-    username = session['username']
-
-    # Fetch student details and available labs
-    with get_db_connection('studentuser.db') as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT firstname, remaining_sessions FROM students WHERE username=?", (username,))
-        student = cur.fetchone()
-    # Example: Fetch available labs
-    with get_db_connection('labs.db') as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM computer_labs WHERE status='Available'")
-        labs = cur.fetchall()
-
-    if not student:
-        flash("Student record not found.", "danger")
-        return redirect(url_for('logout'))
-
-    return render_template('student_dashboard.html',
-                           firstname=student["firstname"],
-                           remaining_sessions=student["remaining_sessions"],
-                           labs=labs)
 
 @app.route('/edit_student_record', methods=['GET', 'POST'])
 def edit_student_record():
@@ -593,11 +540,10 @@ def edit_student_record():
         idno = request.form.get('idno', '')
 
         # Update record
-        cur.execute('''
-            UPDATE students
-            SET firstname=?, lastname=?, midname=?, email=?, course=?, yearlevel=?, idno=?
-            WHERE username=?
-        ''', (firstname, lastname, midname, email, course, yearlevel, idno, username))
+        cur.execute('''UPDATE students
+                       SET firstname=?, lastname=?, midname=?, email=?, course=?, yearlevel=?, idno=?
+                       WHERE username=?''', 
+                   (firstname, lastname, midname, email, course, yearlevel, idno, username))
 
         conn.commit()
         conn.close()
@@ -606,7 +552,6 @@ def edit_student_record():
         return redirect(url_for('student_dashboard'))
 
     conn.close()
-    return render_template('edit_student_record.html', student=student)
 
     # Example: Fetch student details
     with get_db_connection('studentuser.db') as conn:
@@ -615,6 +560,40 @@ def edit_student_record():
         student = cur.fetchone()
 
     return render_template('edit_student_record.html', student=student)
+
+# Route: Student Dashboard
+@app.route('/student/dashboard')
+def student_dashboard():
+    if 'username' not in session or session.get('role') != 'students':
+        return redirect(url_for('login'))
+
+    username = session['username']
+
+    # Fetch student details, including remaining sessions
+    with get_db_connection('studentuser.db') as conn:
+        conn.row_factory = sqlite3.Row  # Enables dictionary-like access
+        cur = conn.cursor()
+        cur.execute("SELECT firstname, remaining_sessions FROM students WHERE username=?", (username,))
+        student = cur.fetchone()
+
+    if not student:
+        flash("Student record not found.", "danger")
+        return redirect(url_for('logout'))
+
+    # Fetch available labs from labs.db
+    with get_db_connection('labs.db') as conn:
+        conn.row_factory = sqlite3.Row  
+        cur = conn.cursor()
+        cur.execute("SELECT id, number, capacity FROM labs")
+        labs = cur.fetchall()
+
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d")  # Make sure this line is correct
+
+    return render_template('student_dashboard.html',
+                           firstname=student["firstname"],
+                           remaining_sessions=student["remaining_sessions"],
+                           labs=labs,
+                           current_date=current_date)
 
 # Route: Make a Reservation
 @app.route('/make_reservation', methods=['POST'])
@@ -628,32 +607,58 @@ def make_reservation():
     time = request.form['time']
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Fetch student's remaining sessions
-    with get_db_connection('studentuser.db') as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT remaining_sessions FROM students WHERE username=?", (username,))
-        student = cur.fetchone()
-
-    if not student or student[0] is None or student[0] <= 0:
-        flash("You have no remaining sit-in sessions!", "danger")
-        return redirect(url_for('student_dashboard'))
-
-    # Insert reservation & update session count atomically
     try:
+        # 1️⃣ Check if the selected lab exists
+        with get_db_connection('labs.db') as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id, capacity FROM labs WHERE id=?", (lab_id,))
+            lab = cur.fetchone()
+        
+        if not lab:
+            flash("Invalid lab selection!", "danger")
+            return redirect(url_for('student_dashboard'))
+        
+        lab_capacity = lab['capacity']  # Use dictionary-like access
+
+        # 2️⃣ Check if the student has remaining sit-in sessions
+        with get_db_connection('studentuser.db') as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT remaining_sessions FROM students WHERE username=?", (username,))
+            student = cur.fetchone()
+        
+        if not student or student['remaining_sessions'] is None or student['remaining_sessions'] <= 0:
+            flash("You have no remaining sit-in sessions!", "danger")
+            return redirect(url_for('student_dashboard'))
+
+        # 3️⃣ Check if the lab is full for the selected time slot
         with get_db_connection('reservations.db') as conn:
             cur = conn.cursor()
-            cur.execute('''
-                INSERT INTO reservations (username, lab_id, date, time, created_at)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (username, lab_id, date, time, timestamp))
+            cur.execute("""SELECT COUNT(*) FROM reservations 
+                            WHERE lab_id=? AND date=? AND time=?""", 
+                            (lab_id, date, time))
+            current_reservations = cur.fetchone()[0]
+
+        if current_reservations >= lab_capacity:
+            flash("Lab is already full for the selected time!", "danger")
+            return redirect(url_for('student_dashboard'))
+
+        # 4️⃣ Insert reservation & update remaining sessions atomically
+        with get_db_connection('reservations.db') as conn:
+            cur = conn.cursor()
+            cur.execute("""INSERT INTO reservations (username, lab_id, date, time, created_at)
+                            VALUES (?, ?, ?, ?, ?)""", 
+                            (username, lab_id, date, time, timestamp))
             conn.commit()
 
         with get_db_connection('studentuser.db') as conn:
             cur = conn.cursor()
-            cur.execute("UPDATE students SET remaining_sessions = remaining_sessions - 1 WHERE username=?", (username,))
+            cur.execute("""UPDATE students SET remaining_sessions = remaining_sessions - 1 
+                            WHERE username=?""", 
+                            (username,))
             conn.commit()
 
         flash("Reservation successful!", "success")
+    
     except sqlite3.Error as e:
         flash(f"Database error: {e}", "danger")
 
@@ -794,8 +799,6 @@ def delete_reservation(reservation_id):
 
 @app.route('/sit_in_records')
 def sit_in_records():
-    create_table()  # Ensure the table exists before querying
-    
     conn = get_db_connection()
     cur = conn.cursor()
     

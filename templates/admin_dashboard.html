@@ -164,6 +164,10 @@
                     <h5 class="modal-title" id="compLabModalLabel">Computer Laboratories Status</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
+                <!-- Add New Computer Lab Button (Inside Computer Lab Modal) -->
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addLabModal">
+                        Add New Computer Lab
+                </button>
                 <div class="modal-body">
                     <table class="table">
                         <thead>
@@ -183,43 +187,32 @@
                             {% endfor %}
                         </tbody>
                     </table>
-    
-                    <hr>
-    
-                    <!-- Button to open Add Lab modal -->
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLabModal">
-                        Add New Computer Lab
-                    </button>
-    
-                    <!-- Add Computer Lab Modal -->
-                    <div class="modal fade" id="addLabModal" tabindex="-1" aria-labelledby="addLabModalLabel" aria-hidden="true">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title" id="addLabModalLabel">Add New Computer Lab</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <form action="{{ url_for('add_lab') }}" method="POST">
-                                        <div class="mb-3">
-                                            <label for="lab_number" class="form-label">Lab Number</label>
-                                            <input type="text" class="form-control" id="lab_number" name="lab_number" required>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="lab_capacity" class="form-label">Capacity</label>
-                                            <input type="number" class="form-control" id="lab_capacity" name="lab_capacity" required>
-                                        </div>
-                                        <button type="submit" class="btn btn-success">Confirm</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-    
                 </div>
             </div>
         </div>
     </div>
-       
-
+    <!-- Add New Computer Lab Modal (Moved Outside) -->
+    <div class="modal fade" id="addLabModal" tabindex="-1" aria-labelledby="addLabModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addLabModalLabel">Add New Computer Lab</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="{{ url_for('add_lab') }}" method="POST">
+                        <div class="mb-3">
+                            <label for="lab_number" class="form-label">Lab Number</label>
+                            <input type="text" class="form-control" id="lab_number" name="lab_number" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="lab_capacity" class="form-label">Capacity</label>
+                                <input type="number" class="form-control" id="lab_capacity" name="lab_capacity" required>
+                        </div>
+                        <button type="submit" class="btn btn-success">Confirm</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}

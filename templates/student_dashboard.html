@@ -15,7 +15,11 @@
         <!-- View Remaining Sessions -->
         <div class="col-md-4">
             <h4>Remaining Sit-In Sessions</h4>
-            <p>You have <strong>{{ remaining_sessions }}</strong> sessions left.</p>
+            {% if remaining_sessions is not none %}
+                <p>You have <strong>{{ remaining_sessions }}</strong> sessions left.</p>
+            {% else %}
+                <p class="text-danger">No session data available.</p>
+            {% endif %}
         </div>
 
         <!-- Make Reservation -->
@@ -27,26 +31,31 @@
                     <select class="form-control" id="lab" name="lab" required>
                         {% if labs %}
                             {% for lab in labs %}
-                                <option value="{{ lab['id'] }}">{{ lab['number'] }} (Capacity: {{ lab['capacity'] }})</option>
+                                <option value="{{ lab.id }}">{{ lab.number }} (Capacity: {{ lab.capacity }})</option>
                             {% endfor %}
                         {% else %}
                             <option disabled>No labs available</option>
                         {% endif %}
                     </select>
-                </div>
+                </div>  
+
                 <div class="form-group">
                     <label for="date">Date:</label>
-                    <input type="date" class="form-control" id="date" name="date" required>
+                    <input type="date" class="form-control" id="date" name="date" required 
+                           min="{{ current_date }}">
                 </div>
+
                 <div class="form-group">
                     <label for="time">Time:</label>
                     <input type="time" class="form-control" id="time" name="time" required>
                 </div>
+
                 <button type="submit" class="btn btn-success mt-2">Reserve</button>
             </form>
         </div>
-        
-    <hr>
-    <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+
+        <hr>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+    </div>
 </div>
 {% endblock %}
