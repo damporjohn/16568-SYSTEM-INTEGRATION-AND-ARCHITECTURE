@@ -2,12 +2,14 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime  
-from datetime import date 
+from datetime import date
+from flask_wtf.csrf import CSRFProtect
 
 registration_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Set your secret key for session management
+csrf = CSRFProtect(app)  # Enable CSRF protection
 
 # Function to create tables in separate databases
 # Function: Initialize Databases (Run Once)
@@ -370,22 +372,38 @@ def admin_dashboard():
 
     return render_template('admin_dashboard.html', staff_members=staff_members, deans=deans, labs=labs)
 
-#MAG DELETE OG STAFF
 @app.route('/delete_staff/<idno>', methods=['POST'])
 def delete_staff(idno):
-    if session.get('role') != 'admins':
-        return redirect(url_for('dashboard'))  # Redirect if not an admin
-    
-    with sqlite3.connect('staffuser.db') as conn:
-        cursor = conn.cursor()
-        try:
+    # Debug: Print the ID of the staff member to be deleted
+    print(f"Attempting to delete staff member with ID: {idno}")
+
+    # Connect to the database
+    try:
+        with sqlite3.connect('staffuser.db') as conn:
+            cursor = conn.cursor()
+
+            # Debug: Check if the staff member exists before deletion
+            cursor.execute("SELECT * FROM staffs WHERE idno=?", (idno,))
+            staff_member = cursor.fetchone()
+            if not staff_member:
+                flash(f"Staff member with ID {idno} not found.", "error")
+                return redirect(url_for('admin_dashboard'))
+
+            # Delete the staff member
             cursor.execute("DELETE FROM staffs WHERE idno=?", (idno,))
             conn.commit()
-            flash("Staff member deleted successfully.", "success")  # Success message
-        except sqlite3.Error as e:
-            flash("An error occurred while deleting the staff member: " + str(e), "error")  # Error message
 
-    return redirect(url_for('admin_dashboard'))  # Redirect back to admin dashboard
+            # Debug: Print success message
+            print(f"Staff member with ID {idno} deleted successfully.")
+            flash("Staff member deleted successfully.", "success")
+
+    except sqlite3.Error as e:
+        # Debug: Print the database error
+        print(f"Database error: {e}")
+        flash(f"An error occurred while deleting the staff member: {e}", "error")
+
+    # Redirect back to the admin dashboard
+    return redirect(url_for('admin_dashboard'))
 
 #MAG ADD/REGISTER OG DEAN
 @app.route('/add_dean', methods=['POST'])
@@ -489,11 +507,14 @@ def student_dashboard():
 def edit_student_record():
     print("Session Data:", session)  # Debug session contents
 
-    if 'username' not in session or session.get('role') != 'students':
+    # Check if the user is logged in and has the correct role
+    if 'username' not in session or session.get('role') != 'student':
         flash("Unauthorized access.", "danger")
-        return redirect(url_for('login'))  # Ensure 'login' is the correct route
+        return redirect(url_for('login_dashboard'))  # Ensure 'login' is the correct route
 
-    username = session['username']
+    # Retrieve the username from the session
+    username = session.get('username')
+    print("Username from session:", username)  # Debug username
 
     # Open connection to studentuser.db
     conn_user = get_db_connection('studentuser.db')
@@ -511,13 +532,13 @@ def edit_student_record():
 
     if request.method == 'POST':
         try:
-            # Collect form data (use existing values if fields are empty)
-            firstname = request.form.get('firstname', student[1]) or student[1]
-            lastname = request.form.get('lastname', student[2]) or student[2]
-            midname = request.form.get('midname', student[3]) or student[3]
-            email = request.form.get('email', student[4]) or student[4]
-            course = request.form.get('course', student[5]) or student[5]
-            yearlevel = request.form.get('yearlevel', student[6]) or student[6]
+            # Collect form data
+            firstname = request.form.get('firstname', student[1])
+            lastname = request.form.get('lastname', student[2])
+            midname = request.form.get('midname', student[3])
+            email = request.form.get('email', student[4])
+            course = request.form.get('course', student[5])
+            yearlevel = request.form.get('yearlevel', student[6])
 
             # Update student record
             cur_user.execute('''
@@ -547,8 +568,6 @@ def edit_student_record():
     }
 
     return render_template('edit_student_record.html', student=student_dict)
-
-
 
 @app.route('/make_reservation', methods=['POST'])
 def make_reservation():
