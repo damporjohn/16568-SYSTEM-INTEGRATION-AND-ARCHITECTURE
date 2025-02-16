@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% block title %}Sit-in Rules{% endblock %}
+
 {% block content %}
 <style>
     body {
@@ -63,49 +65,13 @@
 </div>
 
 <div class="content" id="content">
-    <div class="container mt-4">
-        <div class="card shadow-sm p-4">
-            <h2 class="mb-3 text-center">Student Information</h2>
-            {% if student %}
-            <table class="table">
-                <tr>
-                    <th>ID No:</th>
-                    <td>{{ student.idno }}</td>
-                </tr>
-                <tr>
-                    <th>Username:</th>
-                    <td>{{ student.username }}</td>
-                </tr>
-                <tr>
-                    <th>Full Name:</th>
-                    <td>{{ student.firstname }} {{ student.midname or '' }} {{ student.lastname }}</td>
-                </tr>
-                <tr>
-                    <th>Course:</th>
-                    <td>{{ student.course }}</td>
-                </tr>
-                <tr>
-                    <th>Year Level:</th>
-                    <td>{{ student.yearlevel }}</td>
-                </tr>
-                <tr>
-                    <th>Email:</th>
-                    <td>{{ student.email }}</td>
-                </tr>
-                <tr>
-                    <th>Registration Date:</th>
-                    <td>{{ student.registration_date }}</td>
-                </tr>
-                <tr>
-                    <th>Remaining Sessions:</th>
-                    <td>{{ student.remaining_sessions }}</td>
-                </tr>
-            </table>
-            {% else %}
-            <p class="text-center text-danger">No student data found.</p>
-            {% endif %}
-        </div>
-    </div>
+    <h1>Sit-in Rules</h1>
+    <ol>
+        <li>Students must register before attending a sit-in session.</li>
+        <li>Respect the lab environment and other students.</li>
+        <li>No food or drinks allowed inside the lab.</li>
+        <li>Attendance must be verified before leaving.</li>
+    </ol>
 </div>
 
 <script>

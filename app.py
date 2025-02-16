@@ -96,7 +96,10 @@ def init_db():
 
 # Function: Initialize Reservations Table (Run Once)
 def init_reservations_table():
-    with sqlite3.connect('reservations.db') as conn:
+    db_name = 'reservations.db'
+    print(f"Initializing database at: {db_name}")
+
+    with get_db_connection(db_name) as conn:
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS reservations (
@@ -109,6 +112,7 @@ def init_reservations_table():
             )
         ''')
         conn.commit()
+        print("Table 'reservations' ensured.")
 
 
 
@@ -572,6 +576,36 @@ def make_reservation():
 def lab_rules():
     return render_template('lab_rules_&_regulation.html')
 
+@app.route('/announcements')
+def announcements():
+    return render_template('announcements.html')
+
+@app.route('/remaining_sessions')
+def remaining_sessions():
+    return render_template('remaining_sessions.html')
+
+@app.route('/sit_in_rules')
+def sit_in_rules():
+    return render_template('sit_in_rules.html')
+
+from datetime import datetime
+
+@app.route('/sit_in_history')
+def sit_in_history():
+    """Fetch sit-in history for the logged-in user."""
+    username = session.get('username')  # Ensure the user is logged in
+    if not username:
+        return "Unauthorized", 403  # Handle unauthorized access
+
+    db = get_db_connection('reservations.db')  # Use get_db_connection()
+    cursor = db.cursor()
+    cursor.execute("SELECT date, time, lab_id FROM reservations WHERE username = ?", (username,))
+    sit_in_records = cursor.fetchall()
+    db.close()
+
+    today = datetime.today().strftime('%Y-%m-%d')  # Get today's date in string format
+
+    return render_template('sit_in_history.html', sit_in_records=sit_in_records, today=today)
 
 #ARI RA KUTOB STUDENT 
 
@@ -766,4 +800,5 @@ def logout():
     return redirect(url_for('login_dashboard'))  # Redirect to login page
 
 if __name__ == '__main__':
+    init_reservations_table()  # Ensure the table is created
     app.run(debug=True)  # Run the application in debug mode
