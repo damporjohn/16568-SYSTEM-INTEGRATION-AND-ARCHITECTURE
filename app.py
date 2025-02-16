@@ -3,13 +3,11 @@ import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime  
 from datetime import date
-from flask_wtf.csrf import CSRFProtect
 
 registration_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Set your secret key for session management
-csrf = CSRFProtect(app)  # Enable CSRF protection
 
 # Function to create tables in separate databases
 # Function: Initialize Databases (Run Once)
@@ -112,37 +110,6 @@ def init_reservations_table():
         ''')
         conn.commit()
 
-# Ensure reservations table exists
-def create_reservations_table():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS reservations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            lab_id TEXT NOT NULL,
-            date TEXT NOT NULL,
-            time TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-# Ensure table exists
-def create_table():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS sit_in_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            lab_id TEXT NOT NULL,
-            date TEXT NOT NULL,
-            time TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
 
 
     
@@ -467,18 +434,22 @@ def add_lab():
 
 
 # Student Dashboard Route
-@app.route('/student_dashboard') 
+@app.route('/student_dashboard')
 def student_dashboard():
-    if 'username' not in session or session.get('role') != 'student':  # Ensure role is 'student'
+    if 'username' not in session or session.get('role') != 'student':  
         flash("You need to log in first.", "danger")
         return redirect(url_for('login_dashboard'))
 
     username = session['username']
 
-    # Open connection to studentuser.db
-    conn_user = get_db_connection('studentuser.db')  # Use get_db_connection() if defined
+    # Get student information (Fetching ALL columns)
+    conn_user = get_db_connection('studentuser.db')
     cursor_user = conn_user.cursor()
-    cursor_user.execute("SELECT firstname, lastname, email, course, yearlevel FROM students WHERE username = ?", (username,))
+    cursor_user.execute('''
+        SELECT idno, username, firstname, midname, lastname, 
+               course, yearlevel, email, registration_date, remaining_sessions 
+        FROM students WHERE username = ?
+    ''', (username,))
     student = cursor_user.fetchone()
     conn_user.close()
 
@@ -486,44 +457,48 @@ def student_dashboard():
         flash("Student record not found.", "danger")
         return redirect(url_for('login_dashboard'))
 
-    # Open connection to labs.db
-    conn_labs = get_db_connection('labs.db')  # Use get_db_connection() if defined
+    # Convert to dictionary
+    student_dict = {key: student[key] for key in student.keys()}  
+
+    # Get lab information
+    conn_labs = get_db_connection('labs.db')
     cursor_labs = conn_labs.cursor()
     cursor_labs.execute("SELECT id, number, capacity FROM labs")
     labs = cursor_labs.fetchall()
     conn_labs.close()
 
     return render_template('student_dashboard.html', 
-                           firstname=student[0], 
-                           lastname=student[1], 
-                           email=student[2], 
-                           course=student[3], 
-                           yearlevel=student[4], 
-                           labs=[{"id": lab[0], "number": lab[1], "capacity": lab[2]} for lab in labs], 
+                           student=student_dict,  # Ensures student data is always passed
+                           labs=[dict(lab) for lab in labs],  
                            current_date=date.today().isoformat())
 
 
 @app.route('/edit_student_record', methods=['GET', 'POST'])
 def edit_student_record():
-    print("Session Data:", session)  # Debug session contents
+    print("Session Data:", session)  # Debugging
 
-    # Check if the user is logged in and has the correct role
+    # Check if user is logged in and a student
     if 'username' not in session or session.get('role') != 'student':
         flash("Unauthorized access.", "danger")
-        return redirect(url_for('login_dashboard'))  # Ensure 'login' is the correct route
+        return redirect(url_for('login_dashboard'))
 
-    # Retrieve the username from the session
+    # Retrieve username from session
     username = session.get('username')
-    print("Username from session:", username)  # Debug username
 
     # Open connection to studentuser.db
     conn_user = get_db_connection('studentuser.db')
     cur_user = conn_user.cursor()
 
-    # Fetch the student's record
-    cur_user.execute("SELECT * FROM students WHERE username = ?", (username,))
+    # Fetch the correct student record
+    cur_user.execute("""
+        SELECT id, idno, username, password, firstname, lastname, midname, course, yearlevel, email, registration_date, remaining_sessions
+        FROM students WHERE username = ?
+    """, (username,))
+    
     student = cur_user.fetchone()
-    print("Fetched Student Record:", student)  # Debug student data
+    
+    # Debugging: Ensure correct data is retrieved
+    print("Fetched Student Record:", student)  
 
     if not student:
         flash("Student record not found.", "danger")
@@ -533,19 +508,19 @@ def edit_student_record():
     if request.method == 'POST':
         try:
             # Collect form data
-            firstname = request.form.get('firstname', student[1])
-            lastname = request.form.get('lastname', student[2])
-            midname = request.form.get('midname', student[3])
-            email = request.form.get('email', student[4])
-            course = request.form.get('course', student[5])
-            yearlevel = request.form.get('yearlevel', student[6])
+            firstname = request.form.get('firstname', student[4])  # Correct index
+            lastname = request.form.get('lastname', student[5])  # Correct index
+            midname = request.form.get('midname', student[6])  # Correct index
+            course = request.form.get('course', student[7])  # Correct index
+            yearlevel = request.form.get('yearlevel', student[8])  # Correct index
+            email = request.form.get('email', student[9])  # Correct index
 
             # Update student record
-            cur_user.execute('''
+            cur_user.execute("""
                 UPDATE students 
-                SET firstname=?, lastname=?, midname=?, email=?, course=?, yearlevel=?
+                SET firstname=?, lastname=?, midname=?, course=?, yearlevel=?, email=?
                 WHERE username=?
-            ''', (firstname, lastname, midname, email, course, yearlevel, username))
+            """, (firstname, lastname, midname, course, yearlevel, email, username))
             conn_user.commit()
 
             flash("Your record has been updated successfully!", "success")
@@ -555,90 +530,48 @@ def edit_student_record():
             flash(f"Database error: {e}", "danger")
 
     conn_user.close()
-    
-    # Ensure student is passed as a dictionary
+
+    # Convert student tuple to dictionary for template
     student_dict = {
         'id': student[0],
-        'firstname': student[1],
-        'lastname': student[2],
-        'midname': student[3] if student[3] else '',
-        'email': student[4],
-        'course': student[5] if student[5] else '',
-        'yearlevel': student[6]
+        'idno': student[1],
+        'username': student[2],
+        'firstname': student[4],  
+        'lastname': student[5],  
+        'midname': student[6] if student[6] else '',
+        'course': student[7] if student[7] else '',
+        'yearlevel': student[8],
+        'email': student[9] if student[9] else '',
+        'registration_date': student[10],
+        'remaining_sessions': student[11]
     }
 
     return render_template('edit_student_record.html', student=student_dict)
 
-@app.route('/make_reservation', methods=['POST'])
+@app.route('/make_reservation', methods=['GET', 'POST']) 
 def make_reservation():
-    if 'username' not in session or session.get('role') != 'students':
-        return redirect(url_for('login'))
-    
-    username = session['username']
-    lab_id = request.form['lab']
-    date = request.form['date']
-    time = request.form['time']
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if 'username' not in session or session.get('role') != 'student':
+        return redirect(url_for('login_dashboard'))
 
+    labs = []
     try:
-        # ✅ Fetch lab details from labs.db
-        with get_db_connection('labs.db') as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT id, capacity FROM labs WHERE id=?", (lab_id,))
-            lab = cur.fetchone()
+        with sqlite3.connect('labs.db') as conn:
+            cursor = conn.cursor()
+            # 🔥 FIXED: Changed table name from `labs` to `computer_labs`
+            cursor.execute("SELECT id, number, capacity, status FROM computer_labs WHERE status = 'Available'")
+            labs = [{'id': row[0], 'number': row[1], 'capacity': row[2], 'status': row[3]} for row in cursor.fetchall()]
         
-        if not lab:
-            flash("Invalid lab selection!", "danger")
-            return redirect(url_for('student_dashboard'))
-        
-        lab_capacity = lab[1]  # Extract lab capacity
-
-        # ✅ Check student's remaining sessions in studentuser.db
-        with get_db_connection('studentuser.db') as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT remaining_sessions FROM students WHERE username=?", (username,))
-            student = cur.fetchone()
-        
-        if not student or student[0] <= 0:
-            flash("You have no remaining sit-in sessions!", "danger")
-            return redirect(url_for('student_dashboard'))
-        
-        # ✅ Check if lab is full for the selected date & time
-        with get_db_connection('reservations.db') as conn:
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT COUNT(*) FROM reservations 
-                WHERE lab_id=? AND date=? AND time=?
-            """, (lab_id, date, time))
-            current_reservations = cur.fetchone()[0]
-        
-        if current_reservations >= lab_capacity:
-            flash("Lab is already full for the selected time!", "danger")
-            return redirect(url_for('student_dashboard'))
-
-        # ✅ Insert reservation & update student's remaining sessions atomically
-        with get_db_connection('reservations.db') as conn:
-            cur = conn.cursor()
-            cur.execute("""
-                INSERT INTO reservations (username, lab_id, date, time, created_at)
-                VALUES (?, ?, ?, ?, ?)
-            """, (username, lab_id, date, time, timestamp))
-            conn.commit()
-        
-        with get_db_connection('studentuser.db') as conn:
-            cur = conn.cursor()
-            cur.execute("""
-                UPDATE students SET remaining_sessions = remaining_sessions - 1 
-                WHERE username=?
-            """, (username,))
-            conn.commit()
-
-        flash("Reservation successful!", "success")
-    
+        # ✅ Debugging: Print labs to check if data exists
+        print("Labs Retrieved:", labs)  
     except sqlite3.Error as e:
         flash(f"Database error: {e}", "danger")
-    
-    return redirect(url_for('student_dashboard'))
+
+    return render_template('make_reservation.html', labs=labs)
+
+@app.route('/lab_rules_&_regulation')
+def lab_rules():
+    return render_template('lab_rules_&_regulation.html')
+
 
 #ARI RA KUTOB STUDENT 
 
@@ -658,8 +591,6 @@ def make_reservation():
 def staff_dashboard():
     if session.get('role') != 'staff':  # Should be 'staff' instead of 'staffs'
         return redirect(url_for('login_dashboard'))
-
-    create_reservations_table()  # Ensure table exists before querying
 
     conn = get_db_connection()
     cur = conn.cursor()
