@@ -195,17 +195,17 @@ def get_db():
 def home():
     if request.method == 'POST':
         if 'login' in request.form:
-            return redirect(url_for('login_dashboard'))  # Redirect to login page if login button is pressed
+            return redirect(url_for('login_dashboard'))
         elif 'register' in request.form:
-            return redirect(url_for('register_user'))  # Redirect to register page if register button is pressed
+            return redirect(url_for('register_user'))
 
-    return render_template('index.html')  # Render home page template
+    return render_template('index.html')
 
-# Combined Login and Dashboard Route
+# Combined Login & Dashboard Route
 @app.route('/login', methods=['GET', 'POST'])
 def login_dashboard():
     if 'role' in session and session['role'] in ['admin', 'staff', 'student']:
-        return redirect(url_for(f"{session['role']}_dashboard"))  # Redirect only if authenticated
+        return redirect(url_for(f"{session['role']}_dashboard")) 
 
     error = None
     if request.method == 'POST':
@@ -427,8 +427,21 @@ def add_lab():
 
     return redirect(url_for('admin_dashboard'))
 
+@app.route('/Sit_in')
+def Sit_in():
+    return render_template('Sit_in.html')
 
+@app.route('/View_Sit_in_Records')
+def View_Sit_in_Records():
+    return render_template('View_Sit_in_Records.html')
 
+@app.route('/Feedback_Reports')
+def Feedback_Reports():
+    return render_template('Feedback_Reports.html')
+
+@app.route('/Reservation')
+def Reservation():
+    return render_template('Reservation.html')
 
 
 
@@ -450,7 +463,7 @@ def student_dashboard():
     conn_user = get_db_connection('studentuser.db')
     cursor_user = conn_user.cursor()
     cursor_user.execute('''
-        SELECT idno, username, firstname, midname, lastname, 
+        SELECT id, idno, username, firstname, midname, lastname, 
                course, yearlevel, email, registration_date, remaining_sessions 
         FROM students WHERE username = ?
     ''', (username,))
@@ -461,7 +474,6 @@ def student_dashboard():
         flash("Student record not found.", "danger")
         return redirect(url_for('login_dashboard'))
 
-    # Convert to dictionary
     student_dict = {key: student[key] for key in student.keys()}  
 
     # Get lab information
@@ -472,14 +484,14 @@ def student_dashboard():
     conn_labs.close()
 
     return render_template('student_dashboard.html', 
-                           student=student_dict,  # Ensures student data is always passed
+                           student=student_dict, 
                            labs=[dict(lab) for lab in labs],  
                            current_date=date.today().isoformat())
 
 
 @app.route('/edit_student_record', methods=['GET', 'POST'])
 def edit_student_record():
-    print("Session Data:", session)  # Debugging
+    print("Session Data:", session)
 
     # Check if user is logged in and a student
     if 'username' not in session or session.get('role') != 'student':
