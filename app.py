@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime  
@@ -23,7 +23,6 @@ def init_db():
             cursor = conn.cursor()
             cursor.execute(f'''
                 CREATE TABLE IF NOT EXISTS {table_name} (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     idno TEXT UNIQUE NOT NULL,
                     username TEXT UNIQUE NOT NULL,
                     password TEXT NOT NULL,
@@ -77,7 +76,6 @@ def init_db():
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS students (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 idno TEXT UNIQUE NOT NULL,
                 username TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
@@ -317,64 +315,160 @@ def register(role):
 
 
 
-# Admin Dashboard Route
 @app.route('/admin_dashboard')
 def admin_dashboard():
-    if session.get('role') != 'admin':  # Should be 'admin' instead of 'admins'
+    if session.get('role') != 'admin':
         return redirect(url_for('login_dashboard'))
 
-    staff_members = []
-    with sqlite3.connect('staffuser.db') as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT idno, username, firstname, lastname, registration_date FROM staffs")
-        staff_members = cursor.fetchall()
-
+    students = []
     deans = []
-    with sqlite3.connect('adminuser.db') as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, id_number, username, first_name, last_name, email, department, registration_date FROM deans")
-        deans = cursor.fetchall()
-
     labs = []
-    with sqlite3.connect('labs.db') as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, number, capacity, status FROM computer_labs")
-        labs = cursor.fetchall()
 
-    return render_template('admin_dashboard.html', staff_members=staff_members, deans=deans, labs=labs)
-
-@app.route('/delete_staff/<idno>', methods=['POST'])
-def delete_staff(idno):
-    # Debug: Print the ID of the staff member to be deleted
-    print(f"Attempting to delete staff member with ID: {idno}")
-
-    # Connect to the database
     try:
-        with sqlite3.connect('staffuser.db') as conn:
+        # Fetch students from studentuser.db
+        with sqlite3.connect('studentuser.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT idno, username, firstname, midname, lastname, email, registration_date FROM students")
+            students = cursor.fetchall()
+
+        # Fetch deans from adminuser.db
+        with sqlite3.connect('adminuser.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, id_number, username, first_name, last_name, email, department, registration_date FROM deans")
+            deans = cursor.fetchall()
+
+        # Fetch labs from labs.db
+        with sqlite3.connect('labs.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, number, capacity, status FROM computer_labs")
+            labs = cursor.fetchall()
+
+    except sqlite3.Error as e:
+        # Log the error and return an appropriate response
+        print(f"Database error: {e}")
+        return render_template('error.html', message="An error occurred while fetching data.")
+
+    return render_template('admin_dashboard.html', students=students, deans=deans, labs=labs)
+
+@app.route('/get_students', methods=['GET'])
+def get_students():
+    # Get the search query from the request parameters
+    search_query = request.args.get('search_query', '').strip()
+    students = []
+
+    try:
+        with sqlite3.connect('studentuser.db') as conn:
+            conn.row_factory = sqlite3.Row  # Return rows as dictionaries
             cursor = conn.cursor()
 
-            # Debug: Check if the staff member exists before deletion
-            cursor.execute("SELECT * FROM staffs WHERE idno=?", (idno,))
-            staff_member = cursor.fetchone()
-            if not staff_member:
-                flash(f"Staff member with ID {idno} not found.", "error")
-                return redirect(url_for('admin_dashboard'))
+            # Base query to fetch all students
+            query = """
+                SELECT idno, username, firstname, midname, lastname, email, registration_date
+                FROM students
+            """
 
-            # Delete the staff member
-            cursor.execute("DELETE FROM staffs WHERE idno=?", (idno,))
+            # Add a WHERE clause if a search query is provided
+            if search_query:
+                query += """
+                    WHERE idno LIKE ? OR username LIKE ? OR firstname LIKE ?
+                    OR midname LIKE ? OR lastname LIKE ? OR email LIKE ?
+                """
+                wildcard_search = f"%{search_query}%"
+                cursor.execute(query, (wildcard_search,) * 6)
+            else:
+                cursor.execute(query)
+
+            # Fetch all matching students
+            students = cursor.fetchall()
+
+    except sqlite3.Error as e:
+        # Log the error and return an appropriate response
+        print(f"Database error: {e}")
+        return jsonify({'error': 'An error occurred while fetching student data.'}), 500
+
+    # Convert rows to a list of dictionaries for JSON response
+    students_data = [dict(student) for student in students]
+    return jsonify({'students': students_data})
+
+@app.route('/sit_in_form', methods=['POST'])
+def sit_in_form():
+    data = request.json
+
+    try:
+        with sqlite3.connect('sit_in_records.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sit_ins (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    student_id TEXT,
+                    purpose TEXT,
+                    lab TEXT,
+                    remaining_sessions INTEGER,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            cursor.execute("""
+                INSERT INTO sit_ins (student_id, purpose, lab, remaining_sessions) 
+                VALUES (?, ?, ?, ?)
+            """, (data['idno'], data['purpose'], data['lab'], data['remaining_sessions']))
+
+            conn.commit()
+
+        return jsonify({"success": True})
+
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return jsonify({"success": False, "error": "An error occurred while saving the sit-in record."}), 500
+
+@app.route('/get_labs', methods=['GET'])
+def get_labs():
+    labs = []
+
+    try:
+        with sqlite3.connect('labs.db') as conn:
+            conn.row_factory = sqlite3.Row  # Return rows as dictionaries
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, number, capacity, status FROM computer_labs")
+            labs = cursor.fetchall()
+
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return jsonify({'error': 'An error occurred while fetching labs.'}), 500
+
+    labs_data = [dict(lab) for lab in labs]
+    return jsonify({'labs': labs_data})
+
+@app.route('/delete_student/<idno>', methods=['POST'])
+def delete_student(idno):
+    # Debug: Print the ID of the student to be deleted
+    print(f"Attempting to delete student with ID: {idno}")
+
+    # Connect to the student database
+    try:
+        with sqlite3.connect('studentuser.db') as conn:
+            cursor = conn.cursor()
+
+            # Debug: Check if the student exists before deletion
+            cursor.execute("SELECT * FROM students WHERE idno=?", (idno,))
+            student = cursor.fetchone()
+            if not student:
+                flash(f"Student with ID {idno} not found.", "error")
+                return redirect(url_for('admin_dashboard'))  # Redirect back to admin panel
+
+            # Delete the student
+            cursor.execute("DELETE FROM students WHERE idno=?", (idno,))
             conn.commit()
 
             # Debug: Print success message
-            print(f"Staff member with ID {idno} deleted successfully.")
-            flash("Staff member deleted successfully.", "success")
+            print(f"Student with ID {idno} deleted successfully.")
+            flash("Student deleted successfully.", "success")
 
     except sqlite3.Error as e:
-        # Debug: Print the database error
-        print(f"Database error: {e}")
-        flash(f"An error occurred while deleting the staff member: {e}", "error")
+        print(f"Error deleting student: {e}")
+        flash("An error occurred while deleting the student.", "danger")
 
-    # Redirect back to the admin dashboard
-    return redirect(url_for('admin_dashboard'))
+    return redirect(url_for('admin_dashboard'))  # Redirect after deletion
 
 #MAG ADD/REGISTER OG DEAN
 @app.route('/add_dean', methods=['POST'])
@@ -427,10 +521,8 @@ def add_lab():
 
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/Sit_in')
-def Sit_in():
-    return render_template('Sit_in.html')
 
+    
 @app.route('/View_Sit_in_Records')
 def View_Sit_in_Records():
     return render_template('View_Sit_in_Records.html')
@@ -463,8 +555,8 @@ def student_dashboard():
     conn_user = get_db_connection('studentuser.db')
     cursor_user = conn_user.cursor()
     cursor_user.execute('''
-        SELECT id, idno, username, firstname, midname, lastname, 
-               course, yearlevel, email, registration_date, remaining_sessions 
+        SELECT idno, username, firstname, midname, lastname, 
+               course, yearlevel, email, registration_date, remaining_sessions
         FROM students WHERE username = ?
     ''', (username,))
     student = cursor_user.fetchone()
@@ -549,7 +641,6 @@ def edit_student_record():
 
     # Convert student tuple to dictionary for template
     student_dict = {
-        'id': student[0],
         'idno': student[1],
         'username': student[2],
         'firstname': student[4],  
@@ -602,23 +693,20 @@ def sit_in_rules():
 
 from datetime import datetime
 
-@app.route('/sit_in_history')
+@app.route('/sit_in_history', methods=['GET'])
 def sit_in_history():
     """Fetch sit-in history for the logged-in user."""
     username = session.get('username')  # Ensure the user is logged in
     if not username:
-        return "Unauthorized", 403  # Handle unauthorized access
+        return jsonify({"error": "Unauthorized"}), 403  # Handle unauthorized access
 
-    db = get_db_connection('reservations.db')  # Use get_db_connection()
+    db = get_db_connection()
     cursor = db.cursor()
     cursor.execute("SELECT date, time, lab_id FROM reservations WHERE username = ?", (username,))
     sit_in_records = cursor.fetchall()
     db.close()
 
     today = datetime.today().strftime('%Y-%m-%d')  # Get today's date in string format
-
-    return render_template('sit_in_history.html', sit_in_records=sit_in_records, today=today)
-
 #ARI RA KUTOB STUDENT 
 
 
